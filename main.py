@@ -1,0 +1,401 @@
+import math
+import random
+import subprocess
+import sys
+from pathlib import Path
+
+import pygame
+
+# -------------------------------
+# Configuración del juego
+# -------------------------------
+WIDTH, HEIGHT = 1000, 700
+FPS = 60
+BASE_DIR = Path(__file__).resolve().parent
+ASSET_DIR = BASE_DIR / "assets"
+SOUNDS_DIR = ASSET_DIR / "sounds"
+IMAGES_DIR = ASSET_DIR / "images"
+
+# Colores institucionales
+BORDO = (110, 20, 30)
+AMARILLO = (255, 205, 50)
+ROJO = (185, 35, 35)
+BLANCO = (245, 245, 245)
+AZUL_MARINO = (18, 40, 80)
+AZUL_OSCURO = (9, 18, 40)
+GRIS = (220, 220, 220)
+NEGRO = (15, 15, 15)
+NARANJA = (255, 135, 40)
+VERDE = (36, 170, 100)
+CELESTE = (88, 168, 255)
+
+# Estadísticas
+INITIAL_STATS = {
+    "energia": 82,
+    "hambre": 72,
+    "higiene": 76,
+    "felicidad": 78,
+    "programacion": 80,
+}
+
+SOUND_FILES = {
+    "alimentar": SOUNDS_DIR / "eat.wav",
+    "bañar": SOUNDS_DIR / "bath.wav",
+    "jugar": SOUNDS_DIR / "play.wav",
+    "programar": SOUNDS_DIR / "code.wav",
+    "dormir": SOUNDS_DIR / "sleep.wav",
+    "feliz": SOUNDS_DIR / "happy.wav",
+    "triste": SOUNDS_DIR / "sad.wav",
+}
+
+
+def ensure_assets():
+    """Genera assets automáticamente si no existen"""
+    generator = ASSET_DIR / "generate_assets.py"
+    if not generator.exists():
+        return
+
+    required = list(SOUND_FILES.values()) + [
+        IMAGES_DIR / "shield_ipet249.svg",
+        IMAGES_DIR / "pet_happy.svg",
+        IMAGES_DIR / "pet_triste.svg",
+        IMAGES_DIR / "pet_sleep.svg",
+        IMAGES_DIR / "pet_idle.svg",
+    ]
+
+    if any(not path.exists() for path in required):
+        try:
+            subprocess.run([sys.executable, str(generator)], check=True)
+        except Exception:
+            pass
+
+
+class SoundManager:
+    """Maneja reproducción de sonidos"""
+    def __init__(self):
+        self.enabled = True
+        self.sounds = {}
+        for name, path in SOUND_FILES.items():
+            if path.exists():
+                try:
+                    self.sounds[name] = pygame.mixer.Sound(str(path))
+                except Exception:
+                    self.sounds[name] = None
+
+    def play(self, name):
+        if not self.enabled:
+            return
+        sound = self.sounds.get(name)
+        if sound is not None:
+            sound.play()
+
+    def toggle(self):
+        self.enabled = not self.enabled
+
+
+class Mascota:
+    """Clase principal de la mascota virtual"""
+    def __init__(self):
+        self.stats = INITIAL_STATS.copy()
+        self.mood = "feliz"
+        self.anim_timer = 0.0
+        self.juego_activo = None
+        self.last_mood = None
+
+    def update(self, dt):
+        """Actualiza estadísticas y estado emocional"""
+        self.anim_timer += dt
+
+        # Decrecimiento natural de estadísticas
+        self.stats["energia"] = max(0, self.stats["energia"] - dt * 0.7)
+        self.stats["hambre"] = max(0, self.stats["hambre"] - dt * 0.8)
+        self.stats["higiene"] = max(0, self.stats["higiene"] - dt * 0.6)
+        self.stats["felicidad"] = max(0, self.stats["felicidad"] - dt * 0.5)
+        self.stats["programacion"] = max(0, self.stats["programacion"] - dt * 0.45)
+
+        # Cálculo del mood basado en promedio
+        avg = sum(self.stats.values()) / len(self.stats)
+        if avg > 75:
+            self.mood = "feliz"
+        elif avg > 45:
+            self.mood = "tranquilo"
+        elif avg > 25:
+            self.mood = "triste"
+        else:
+            self.mood = "cansado"
+
+    def action(self, accion):
+        """Ejecuta una acción sobre la mascota"""
+        if accion == "alimentar":
+            self.stats["hambre"] = min(100, self.stats["hambre"] + 20)
+            self.stats["energia"] = min(100, self.stats["energia"] + 10)
+            self.stats["felicidad"] = min(100, self.stats["felicidad"] + 8)
+        elif accion == "bañar":
+            self.stats["higiene"] = min(100, self.stats["higiene"] + 24)
+            self.stats["felicidad"] = min(100, self.stats["felicidad"] + 6)
+        elif accion == "jugar":
+            self.stats["felicidad"] = min(100, self.stats["felicidad"] + 22)
+            self.stats["energia"] = max(0, self.stats["energia"] - 8)
+            self.stats["programacion"] = max(0, self.stats["programacion"] - 5)
+        elif accion == "programar":
+            self.stats["programacion"] = min(100, self.stats["programacion"] + 22)
+            self.stats["felicidad"] = min(100, self.stats["felicidad"] + 7)
+            self.stats["energia"] = max(0, self.stats["energia"] - 6)
+        elif accion == "dormir":
+            self.stats["energia"] = min(100, self.stats["energia"] + 26)
+            self.stats["felicidad"] = min(100, self.stats["felicidad"] + 5)
+        elif accion == "reiniciar":
+            self.stats = INITIAL_STATS.copy()
+            self.mood = "feliz"
+
+
+class Button:
+    """Botón interactivo de la interfaz"""
+    def __init__(self, x, y, w, h, text, color, text_color=BLANCO):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.text = text
+        self.color = color
+        self.text_color = text_color
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect, border_radius=16)
+        pygame.draw.rect(screen, BLANCO, self.rect, 2, border_radius=16)
+        font = pygame.font.SysFont("arial", 20, bold=True)
+        label = font.render(self.text, True, self.text_color)
+        screen.blit(label, (self.rect.centerx - label.get_width() / 2, self.rect.centery - label.get_height() / 2))
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+
+
+def draw_shield(screen, x, y, scale=1.0):
+    """Dibuja el escudo del IPET 249"""
+    s = scale
+    shield = pygame.Surface((140 * s, 150 * s), pygame.SRCALPHA)
+    pygame.draw.polygon(shield, BORDO, [(70 * s, 0), (140 * s, 20 * s), (130 * s, 150 * s), (10 * s, 150 * s), (0, 20 * s)])
+    pygame.draw.polygon(shield, AMARILLO, [(70 * s, 18 * s), (122 * s, 32 * s), (112 * s, 128 * s), (28 * s, 128 * s), (18 * s, 32 * s)])
+    pygame.draw.circle(shield, BLANCO, (70 * s, 70 * s), 34 * s)
+    pygame.draw.circle(shield, BORDO, (70 * s, 70 * s), 18 * s)
+    pygame.draw.line(shield, BORDO, (70 * s, 18 * s), (70 * s, 120 * s), 4)
+    pygame.draw.line(shield, BORDO, (18 * s, 70 * s), (120 * s, 70 * s), 4)
+    screen.blit(shield, (x, y))
+
+
+def draw_pet(screen, pet, x, y):
+    """Dibuja el pingüino con animaciones"""
+    bob = math.sin(pet.anim_timer * 3) * 5
+    body_x, body_y = x, y + bob
+
+    # Sombra
+    pygame.draw.ellipse(screen, (35, 52, 72), (body_x - 120, body_y + 150, 240, 40))
+    
+    # Cuerpo principal
+    pygame.draw.ellipse(screen, AZUL_MARINO, (body_x - 110, body_y - 20, 220, 190))
+    pygame.draw.ellipse(screen, BLANCO, (body_x - 75, body_y + 20, 150, 110))
+    
+    # Cabeza
+    pygame.draw.ellipse(screen, AZUL_MARINO, (body_x - 90, body_y - 120, 180, 140))
+
+    # Ojos (posición según mood)
+    if pet.mood in ("feliz", "tranquilo"):
+        eye_y = body_y - 80
+    elif pet.mood == "triste":
+        eye_y = body_y - 70
+    else:
+        eye_y = body_y - 75
+
+    pygame.draw.ellipse(screen, NEGRO, (body_x - 38, eye_y, 20, 20))
+    pygame.draw.ellipse(screen, NEGRO, (body_x + 18, eye_y, 20, 20))
+    pygame.draw.ellipse(screen, BLANCO, (body_x - 32, eye_y + 4, 7, 7))
+    pygame.draw.ellipse(screen, BLANCO, (body_x + 23, eye_y + 4, 7, 7))
+
+    # Pico
+    pygame.draw.polygon(screen, NARANJA, [(body_x, body_y - 100), (body_x + 25, body_y - 70), (body_x - 25, body_y - 70)])
+    
+    # Anteojos
+    pygame.draw.rect(screen, NEGRO, (body_x - 58, body_y - 90, 52, 26), 4)
+    pygame.draw.rect(screen, NEGRO, (body_x + 8, body_y - 90, 52, 26), 4)
+    pygame.draw.line(screen, NEGRO, (body_x - 6, body_y - 77), (body_x + 7, body_y - 77), 4)
+    
+    # Auriculares
+    pygame.draw.arc(screen, AMARILLO, (body_x - 84, body_y - 170, 55, 55), 3.2, 6.2, 8)
+    pygame.draw.arc(screen, AMARILLO, (body_x + 28, body_y - 170, 55, 55), 3.2, 6.2, 8)
+
+    # Patas
+    pygame.draw.rect(screen, NARANJA, (body_x - 45, body_y + 150, 18, 50))
+    pygame.draw.rect(screen, NARANJA, (body_x + 26, body_y + 150, 18, 50))
+
+    # Pechera
+    pygame.draw.rect(screen, BLANCO, (body_x - 68, body_y + 40, 136, 48), border_radius=10)
+    if pet.mood == "feliz":
+        pygame.draw.line(screen, AZUL_MARINO, (body_x - 50, body_y + 63), (body_x - 30, body_y + 63), 6)
+        pygame.draw.line(screen, AZUL_MARINO, (body_x - 20, body_y + 63), (body_x, body_y + 63), 6)
+        pygame.draw.line(screen, AZUL_MARINO, (body_x + 8, body_y + 63), (body_x + 28, body_y + 63), 6)
+    else:
+        pygame.draw.line(screen, AZUL_MARINO, (body_x - 30, body_y + 63), (body_x + 30, body_y + 63), 6)
+
+    # Expresiones
+    if pet.mood == "feliz":
+        pygame.draw.arc(screen, NEGRO, (body_x - 35, body_y - 48, 70, 42), 0.2, 3.1, 4)
+    elif pet.mood == "tranquilo":
+        pygame.draw.line(screen, NEGRO, (body_x - 30, body_y - 42), (body_x + 30, body_y - 38), 4)
+    elif pet.mood == "triste":
+        pygame.draw.arc(screen, NEGRO, (body_x - 35, body_y - 26, 70, 42), 3.3, 6.2, 4)
+    elif pet.mood == "cansado":
+        pygame.draw.line(screen, NEGRO, (body_x - 30, body_y - 40), (body_x + 30, body_y - 40), 4)
+
+
+def draw_bar(screen, x, y, w, h, value, color, label):
+    """Dibuja una barra de estado"""
+    pygame.draw.rect(screen, (80, 80, 80), (x, y, w, h), border_radius=12)
+    pygame.draw.rect(screen, color, (x, y, w * (value / 100), h), border_radius=12)
+    font = pygame.font.SysFont("arial", 18, bold=True)
+    text = font.render(f"{label}: {int(value)}%", True, BLANCO)
+    screen.blit(text, (x, y - 24))
+
+
+def draw_minigame_panel(screen, pet):
+    """Dibuja el panel de minijuegos disponibles"""
+    panel = pygame.Rect(670, 320, 270, 220)
+    pygame.draw.rect(screen, (39, 45, 72), panel, border_radius=18)
+    pygame.draw.rect(screen, AMARILLO, panel, 3, border_radius=18)
+
+    font = pygame.font.SysFont("arial", 22, bold=True)
+    label = font.render("MINIJUEGOS", True, BLANCO)
+    screen.blit(label, (panel.x + 20, panel.y + 15))
+
+    juegos = [
+        ("Space Invaders", "A", AZUL_MARINO),
+        ("Voley", "B", VERDE),
+        ("Autos", "C", ROJO),
+    ]
+
+    for i, (name, code, color) in enumerate(juegos):
+        rect = pygame.Rect(panel.x + 18, panel.y + 60 + i * 45, 220, 32)
+        pygame.draw.rect(screen, color, rect, border_radius=10)
+        txt = pygame.font.SysFont("arial", 18, bold=True)
+        text = txt.render(f"{code} - {name}", True, BLANCO)
+        screen.blit(text, (rect.x + 12, rect.y + 6))
+
+    if pet.juego_activo:
+        sub = pygame.font.SysFont("arial", 18, bold=True)
+        info = sub.render(f"Activo: {pet.juego_activo}", True, AMARILLO)
+        screen.blit(info, (panel.x + 18, panel.y + 185))
+
+
+def main():
+    """Función principal del juego"""
+    ensure_assets()
+
+    pygame.init()
+    pygame.mixer.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Mascota Virtual de Informática - IPET 249")
+    clock = pygame.time.Clock()
+
+    pet = Mascota()
+    sound_manager = SoundManager()
+
+    buttons = [
+        Button(80, 560, 140, 50, "1. Alimentar", BORDO),
+        Button(235, 560, 140, 50, "2. Bañar", AZUL_MARINO),
+        Button(390, 560, 140, 50, "3. Jugar", ROJO),
+        Button(545, 560, 140, 50, "4. Programar", VERDE),
+        Button(700, 560, 140, 50, "5. Dormir", AZUL_OSCURO),
+    ]
+
+    running = True
+    while running:
+        dt = clock.tick(FPS) / 1000.0
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    pet.action("alimentar")
+                    sound_manager.play("alimentar")
+                elif event.key == pygame.K_2:
+                    pet.action("bañar")
+                    sound_manager.play("bañar")
+                elif event.key == pygame.K_3:
+                    pet.action("jugar")
+                    pet.juego_activo = random.choice(["Space Invaders", "Voley", "Autos"])
+                    sound_manager.play("jugar")
+                elif event.key == pygame.K_4:
+                    pet.action("programar")
+                    sound_manager.play("programar")
+                elif event.key == pygame.K_5:
+                    pet.action("dormir")
+                    sound_manager.play("dormir")
+                elif event.key == pygame.K_r:
+                    pet.action("reiniciar")
+                elif event.key == pygame.K_m:
+                    sound_manager.toggle()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = event.pos
+                for button in buttons:
+                    if button.is_clicked(pos):
+                        if button.text.startswith("1"):
+                            pet.action("alimentar")
+                            sound_manager.play("alimentar")
+                        elif button.text.startswith("2"):
+                            pet.action("bañar")
+                            sound_manager.play("bañar")
+                        elif button.text.startswith("3"):
+                            pet.action("jugar")
+                            pet.juego_activo = random.choice(["Space Invaders", "Voley", "Autos"])
+                            sound_manager.play("jugar")
+                        elif button.text.startswith("4"):
+                            pet.action("programar")
+                            sound_manager.play("programar")
+                        elif button.text.startswith("5"):
+                            pet.action("dormir")
+                            sound_manager.play("dormir")
+
+        pet.update(dt)
+
+        # Renderizado
+        screen.fill((245, 242, 236))
+        pygame.draw.rect(screen, BORDO, (0, 0, WIDTH, 120), border_radius=0)
+        pygame.draw.rect(screen, AMARILLO, (0, 120, WIDTH, 20), border_radius=0)
+        pygame.draw.rect(screen, (13, 15, 18), (0, 140, WIDTH, HEIGHT - 140), border_radius=0)
+
+        draw_shield(screen, 35, 18, 0.85)
+        font = pygame.font.SysFont("arial", 30, bold=True)
+        title = font.render("IPET 249 | Especialidad en Informática", True, BLANCO)
+        screen.blit(title, (190, 35))
+        sub = pygame.font.SysFont("arial", 18)
+        subtitle = sub.render("Laboratorio de Aplicaciones II - 2026", True, BLANCO)
+        screen.blit(subtitle, (190, 75))
+
+        pygame.draw.rect(screen, (30, 35, 52), (50, 170, 300, 250), border_radius=18)
+        pygame.draw.rect(screen, AMARILLO, (50, 170, 300, 250), 3, border_radius=18)
+
+        draw_bar(screen, 70, 210, 250, 18, pet.stats["energia"], (33, 191, 115), "Energía")
+        draw_bar(screen, 70, 255, 250, 18, pet.stats["hambre"], (255, 153, 0), "Hambre")
+        draw_bar(screen, 70, 300, 250, 18, pet.stats["higiene"], (92, 170, 255), "Higiene")
+        draw_bar(screen, 70, 345, 250, 18, pet.stats["felicidad"], (230, 80, 70), "Felicidad")
+        draw_bar(screen, 70, 390, 250, 18, pet.stats["programacion"], (220, 202, 58), "Código")
+
+        draw_pet(screen, pet, 540, 420)
+        draw_minigame_panel(screen, pet)
+
+        mood_font = pygame.font.SysFont("arial", 28, bold=True)
+        mood_text = mood_font.render(f"Estado: {pet.mood.upper()}", True, BLANCO)
+        screen.blit(mood_text, (375, 180))
+
+        sound_label = pygame.font.SysFont("arial", 18, bold=True)
+        text = sound_label.render(f"Sonidos: {'ON' if sound_manager.enabled else 'OFF'} (M)", True, AMARILLO)
+        screen.blit(text, (760, 118))
+
+        for button in buttons:
+            button.draw(screen)
+
+        pygame.display.flip()
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    main()

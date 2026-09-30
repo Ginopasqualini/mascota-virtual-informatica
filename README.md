@@ -8,9 +8,8 @@
 
 ## 🎨 Concepto de la mascota
 
-La mascota virtual de la especialidad es un **pingüino azul marino con barriga blanca**, estilo "Pou" pero completamente adaptado al IPET 249. Su identidad combina elementos de la programación, la cultura gamer y la identidad institucional del colegio.
+La mascota virtual es un **pingüino azul marino con barriga blanca**, estilo "Pou" pero adaptado al IPET 249. Combina elementos tecnológicos con identidad institucional.
 
-### Características visuales:
 - **Color principal:** Azul marino
 - **Color secundario:** Blanco cálido para el abdomen
 - **Accesorios:** Anteojos, auriculares gamer, teclado y pantalla con código
@@ -27,13 +26,15 @@ Crear una mascota virtual interactiva que represente a la especialidad de Inform
 
 ## ✨ Funcionalidades principales
 
-- ✅ **Alimentación** - Aumenta energía y ánimo
-- ✅ **Higiene / Baño** - Mejora limpieza y bienestar
-- ✅ **Recreación** - Minijuegos tipo arcade
-- ✅ **Programación** - Atención de tareas técnicas
-- ✅ **Descanso** - Recarga de energía y batería
-- ✅ **Sistema emocional** - Evolución de estados (feliz, triste, cansado)
-- ✅ **Barras de estado** - Energía, hambre, higiene, felicidad, programación
+- ✅ **Alimentación** de la mascota
+- ✅ **Higiene / Baño**
+- ✅ **Recreación** con minijuegos
+- ✅ **Programación** / atención de tareas
+- ✅ **Descanso** / carga de energía
+- ✅ **Evolución de estado** emocional
+- ✅ **Sistema de estadísticas** y barras de estado
+- ✅ **Sonidos procedurales** para feedback auditivo
+- ✅ **Assets generados automáticamente**
 
 ---
 
@@ -46,8 +47,9 @@ Crear una mascota virtual interactiva que represente a la especialidad de Inform
 | **3** | Jugar | +Felicidad, -Energía, Activa minijuego |
 | **4** | Programar | +Código/Productividad, +Felicidad, -Energía |
 | **5** | Dormir | +Energía, +Felicidad |
+| **M** | Toggle Sonidos | Activa/desactiva audio |
+| **R** | Reiniciar | Restaura valores iniciales |
 | **Mouse** | Clic en botones | Ejecuta la acción del botón |
-| **R** | Reiniciar | Vuelve a los valores iniciales |
 
 ---
 
@@ -127,7 +129,7 @@ La mascota necesita mantenerse en equilibrio emocional y físico:
 
 ### Estados emocionales:
 
-- 🥰 **Feliz** (promedio >75%): Sonrisa amplia, ojos abiertos, movimiento energético
+- 😄 **Feliz** (promedio >75%): Sonrisa amplia, ojos abiertos, movimiento energético
 - 😊 **Tranquilo** (promedio 45-75%): Estado neutral, movimiento normal
 - 😢 **Triste** (promedio 25-45%): Ojos caídos, movimiento lento
 - 😴 **Cansado** (promedio <25%): Parpadeo lento, bordes apagados
@@ -148,16 +150,30 @@ Al presionar **3 (Jugar)**, la mascota accede a minijuegos inspirados en arcade:
 
 ## 📁 Estructura del proyecto
 
-```
+```text
 mascota-virtual-informatica/
 ├── README.md                 # Este archivo
 ├── GDD.md                    # Game Design Document completo
 ├── IA_LOG.md                 # Registro de uso de IA
 ├── requirements.txt          # Dependencias Python
 ├── main.py                   # Código principal del juego
-├── assets/                   # Carpeta para imágenes y sonidos (futura)
-│   └── .gitkeep
-└── .gitignore               # Archivos a ignorar en Git
+├── assets/
+│   ├── generate_assets.py    # Generador procedural de assets
+│   ├── sounds/               # Sonidos WAV (generados automáticamente)
+│   │   ├── eat.wav
+│   │   ├── bath.wav
+│   │   ├── play.wav
+│   │   ├── code.wav
+│   │   ├── sleep.wav
+│   │   ├── happy.wav
+│   │   └── sad.wav
+│   └── images/               # Imágenes SVG (generadas automáticamente)
+│       ├── shield_ipet249.svg
+│       ├── pet_idle.svg
+│       ├── pet_happy.svg
+│       ├── pet_triste.svg
+│       └── pet_sleep.svg
+└── .gitignore
 ```
 
 ---
@@ -167,7 +183,7 @@ mascota-virtual-informatica/
 La escena principal usa la **paleta institucional del IPET 249**:
 
 - 🔴 **Bordó** (#6E141E) - Color principal institucional
-- 🟨 **Amarillo** (#FFCD32) - Acento principal
+- 🟡 **Amarillo** (#FFCD32) - Acento principal
 - 🔴 **Rojo** (#B92323) - Secundario
 - ⚪ **Blanco** (#F5F5F5) - Contraste y limpieza
 - 🔵 **Azul marino** (#122850) - Color del pingüino
@@ -181,6 +197,24 @@ El fondo recrea un **entorno de laboratorio**, con:
 
 ---
 
+## 🔊 Sistema de sonidos
+
+El proyecto incluye **sonidos procedurales generados automáticamente** en formato WAV:
+
+- `eat.wav` - Sonido al alimentar (triángulo)
+- `bath.wav` - Sonido al bañar (senoide)
+- `play.wav` - Sonido al jugar (cuadrado)
+- `code.wav` - Sonido al programar (diente de sierra)
+- `sleep.wav` - Sonido al dormir (senoide grave)
+- `happy.wav` - Sonido feliz (triángulo agudo)
+- `sad.wav` - Sonido triste (senoide grave)
+
+Los sonidos se generan automáticamente al ejecutar `python assets/generate_assets.py` si no existen.
+
+**Control de sonidos:** Presiona **M** para activar/desactivar el audio.
+
+---
+
 ## 🔧 Desarrollo técnico
 
 ### Tecnologías utilizadas:
@@ -191,14 +225,23 @@ El fondo recrea un **entorno de laboratorio**, con:
 ### Características de código:
 - Clase `Mascota` para gestionar estado y lógica
 - Clase `Button` para interfaz de usuario reutilizable
+- Clase `SoundManager` para control de audio
 - Sistema de actualización con delta time (dt)
 - Game loop a 60 FPS
 - Decrecimiento progresivo de estadísticas
 - Sistema de estados emocionales dinámico
+- Generación procedural de assets
 
 ---
 
-## 📚 Créditos
+## 📚 Documentación
+
+- `GDD.md` - Game Design Document completo con todas las mecánicas
+- `IA_LOG.md` - Registro de transparencia del uso de IA
+
+---
+
+## 👨‍💻 Créditos
 
 **Proyecto desarrollado como:** Trabajo Práctico de Recuperación de la Especialidad de Informática  
 **Institución:** IPET 249 "Nicolás Copérnico"  
@@ -208,7 +251,7 @@ El fondo recrea un **entorno de laboratorio**, con:
 
 ---
 
-## 📝 Licencia
+## 📜 Licencia
 
 MIT License - Ver LICENSE para más detalles
 
