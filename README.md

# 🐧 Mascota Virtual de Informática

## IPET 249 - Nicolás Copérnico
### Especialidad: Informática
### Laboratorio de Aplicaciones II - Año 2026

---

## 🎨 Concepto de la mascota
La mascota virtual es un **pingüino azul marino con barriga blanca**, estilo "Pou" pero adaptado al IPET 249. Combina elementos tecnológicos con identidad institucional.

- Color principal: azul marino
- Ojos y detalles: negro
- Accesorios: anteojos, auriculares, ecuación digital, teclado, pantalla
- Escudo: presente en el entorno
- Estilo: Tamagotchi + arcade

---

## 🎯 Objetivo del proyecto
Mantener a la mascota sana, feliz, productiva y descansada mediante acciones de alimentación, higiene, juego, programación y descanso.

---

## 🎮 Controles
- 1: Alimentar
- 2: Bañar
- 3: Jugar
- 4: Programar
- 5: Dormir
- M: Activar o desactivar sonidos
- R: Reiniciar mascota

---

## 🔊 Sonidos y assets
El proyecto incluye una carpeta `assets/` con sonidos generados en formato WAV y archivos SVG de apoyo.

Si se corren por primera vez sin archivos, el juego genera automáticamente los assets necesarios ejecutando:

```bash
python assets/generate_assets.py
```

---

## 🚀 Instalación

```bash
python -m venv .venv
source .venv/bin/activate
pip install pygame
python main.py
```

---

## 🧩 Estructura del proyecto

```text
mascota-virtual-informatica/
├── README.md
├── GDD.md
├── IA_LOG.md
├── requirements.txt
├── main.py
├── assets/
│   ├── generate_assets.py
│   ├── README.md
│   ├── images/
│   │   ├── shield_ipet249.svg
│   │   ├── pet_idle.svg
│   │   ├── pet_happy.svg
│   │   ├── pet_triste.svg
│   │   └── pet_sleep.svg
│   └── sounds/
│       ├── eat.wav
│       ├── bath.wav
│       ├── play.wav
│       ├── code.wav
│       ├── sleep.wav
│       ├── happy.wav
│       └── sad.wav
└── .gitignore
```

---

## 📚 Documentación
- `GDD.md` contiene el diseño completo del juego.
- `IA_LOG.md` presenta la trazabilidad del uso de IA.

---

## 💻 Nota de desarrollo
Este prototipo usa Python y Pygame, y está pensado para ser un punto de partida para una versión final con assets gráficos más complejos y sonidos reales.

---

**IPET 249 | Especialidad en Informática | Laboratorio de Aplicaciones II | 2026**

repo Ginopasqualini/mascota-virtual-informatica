@@ -1,0 +1,41 @@
+# Mascota Virtual de Informática
+
+## IPET 249 - Nicolás Copérnico
+### Especialidad: Informática
+### Laboratorio de Aplicaciones II - Año 2026
+
+Este proyecto incluye un prototipo completo de mascota virtual con:
+- sistema de estadísticas
+- interacciones de cuidado
+- minijuegos
+- sonidos de feedback
+- assets generados automáticamente
+
+## Generación automática de sonidos y assets
+
+Si la carpeta `assets` está vacía, el juego ejecuta el script `assets/generate_assets.py` para crear:
+- `assets/sounds/eat.wav`
+- `assets/sounds/bath.wav`
+- `assets/sounds/play.wav`
+- `assets/sounds/code.wav`
+- `assets/sounds/sleep.wav`
+- `assets/sounds/happy.wav`
+- `assets/sounds/sad.wav`
+- assets SVG para escudo e iconos
+
+## Ejecución
+
+```bash
+python main.py
+```
+
+## Controles
+- 1: Alimentar
+- 2: Bañar
+- 3: Jugar
+- 4: Programar
+- 5: Dormir
+- M: activar/desactivar sonidos
+
+## Nota
+Los sonidos fueron generados procedimentalmente para no depender de archivos externos, y pueden reemplazarse por archivos reales más elaborados si se desea una versión final más pulida.
